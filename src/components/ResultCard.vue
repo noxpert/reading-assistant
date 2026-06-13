@@ -40,11 +40,7 @@
       <template v-if="store.result.notes">
         <v-divider class="my-4" />
         <div class="text-overline text-medium-emphasis mb-2">Notes</div>
-        <v-sheet
-          rounded
-          color="grey-lighten-4"
-          class="pa-3 text-body-2"
-        >
+        <v-sheet rounded color="grey-lighten-4" class="pa-3 text-body-2">
           {{ store.result.notes }}
         </v-sheet>
       </template>

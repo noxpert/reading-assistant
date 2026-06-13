@@ -1,11 +1,5 @@
 <template>
-  <v-chip
-    size="small"
-    label
-    :color="chipColor"
-    :variant="chipVariant"
-    :prepend-icon="chipIcon"
-  >
+  <v-chip size="small" label :color="chipColor" :variant="chipVariant" :prepend-icon="chipIcon">
     {{ chipText }}
   </v-chip>
 </template>

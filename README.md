@@ -1,6 +1,6 @@
 # Vocabulary App
 
-A local-first Vue 3 + Vuetify application for translating Hungarian words and
+A local-first Vue 3 + Vuetify application for translating words and
 phrases via the translation service API. Translate a word, review the result with
 linguistic enrichment (part of speech, root word, notes), and save words to your
 database with a single click.
@@ -66,8 +66,8 @@ This app communicates with the translation service at `http://localhost:8081`.
 The service must be running before using the app. If it is unreachable, a warning
 banner appears at the top of the page.
 
-To start the translation service, see its own `README.md` and run `make up`
-in the `hungarian-service` (or equivalent) directory.
+To start the translation service (https://github.com/noxpert/translation-service). 
+See its own `README.md` and run `make up` in the `translation-service` (or equivalent) directory.
 
 ## Makefile Targets
 

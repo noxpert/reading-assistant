@@ -20,8 +20,8 @@
           class="mb-4"
           icon="mdi-connection"
         >
-          Translation service is not responding. Make sure it is running on port 8081
-          and try refreshing the page.
+          Translation service is not responding. Make sure it is running on port 8081 and try
+          refreshing the page.
         </v-alert>
 
         <TranslateForm />
