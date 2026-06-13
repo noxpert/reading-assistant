@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env
+ai-docs/
+*.local
+.DS_Store
