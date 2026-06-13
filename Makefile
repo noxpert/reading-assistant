@@ -1,4 +1,4 @@
-.PHONY: build up down restart logs dev shell clean help
+.PHONY: build up down restart logs dev shell clean lint help
 
 ## Build the Docker image
 build:
@@ -34,6 +34,11 @@ shell:
 clean:
 	docker compose down --rmi local
 	docker compose build --no-cache
+
+## Run ESLint and Prettier checks
+lint:
+	npm run lint
+	npm run format:check
 
 ## Show this help
 help:

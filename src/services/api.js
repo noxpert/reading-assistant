@@ -57,7 +57,13 @@ export async function search({ text, source_lang, target_lang }) {
   })
 }
 
-export async function saveWord({ translations, part_of_speech, context, source_name, is_verified }) {
+export async function saveWord({
+  translations,
+  part_of_speech,
+  context,
+  source_name,
+  is_verified,
+}) {
   return request('/words', {
     method: 'POST',
     body: JSON.stringify({ translations, part_of_speech, context, source_name, is_verified }),

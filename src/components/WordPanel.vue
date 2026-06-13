@@ -35,7 +35,9 @@
           color="teal-darken-2"
           :loading="saving"
           :disabled="dbStatus !== false"
-          :prepend-icon="dbStatus && typeof dbStatus === 'object' ? 'mdi-check' : 'mdi-bookmark-plus'"
+          :prepend-icon="
+            dbStatus && typeof dbStatus === 'object' ? 'mdi-check' : 'mdi-bookmark-plus'
+          "
           @click="$emit('save')"
         >
           {{ dbStatus && typeof dbStatus === 'object' ? 'Saved' : 'Save word' }}
@@ -55,7 +57,7 @@ const props = defineProps({
   targetText: { type: String, default: '' },
   posCode: { type: String, default: 'other' },
   partsOfSpeech: { type: Array, default: () => [] },
-  dbStatus: { default: null },   // null | false | object
+  dbStatus: { type: [Boolean, Object], default: null }, // null | false | object
   saving: { type: Boolean, default: false },
   isNullRoot: { type: Boolean, default: false },
 })
