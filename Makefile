@@ -1,4 +1,4 @@
-.PHONY: build up down restart logs dev shell clean lint help
+.PHONY: build up down restart logs dev shell clean lint test help
 
 ## Build the Docker image
 build:
@@ -39,6 +39,10 @@ clean:
 lint:
 	npm run lint
 	npm run format:check
+
+## Run Vitest unit tests
+test:
+	npm test
 
 ## Show this help
 help:

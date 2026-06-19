@@ -1,14 +1,14 @@
 <template>
   <v-card class="mt-4">
     <v-card-title class="text-subtitle-1 font-weight-medium pa-4 pb-2">
-      Translation result
+      {{ store.isPhrase ? 'Phrase translation' : 'Translation result' }}
     </v-card-title>
 
     <v-card-text>
       <v-row>
-        <v-col cols="12" sm="6">
+        <v-col cols="12" :sm="store.isPhrase ? 12 : 6">
           <WordPanel
-            label="Input word"
+            :label="store.isPhrase ? 'Phrase' : 'Input word'"
             :source-text="store.result.source_text"
             :target-text="store.result.target_text"
             :pos-code="store.partOfSpeechInput"
@@ -16,12 +16,13 @@
             :db-status="store.inputWordStatus"
             :saving="store.savingInput"
             :is-null-root="false"
+            :is-phrase="store.isPhrase"
             @update:pos-code="store.partOfSpeechInput = $event"
             @save="store.doSaveInput()"
           />
         </v-col>
 
-        <v-col cols="12" sm="6">
+        <v-col v-if="!store.isPhrase" cols="12" sm="6">
           <WordPanel
             label="Root word"
             :source-text="store.result.root_source ?? ''"

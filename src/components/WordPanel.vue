@@ -17,6 +17,7 @@
         <div class="text-body-1 text-medium-emphasis mb-4">{{ targetText || '—' }}</div>
 
         <v-select
+          v-if="!isPhrase"
           :model-value="posCode"
           :items="partsOfSpeech"
           item-value="code"
@@ -40,7 +41,13 @@
           "
           @click="$emit('save')"
         >
-          {{ dbStatus && typeof dbStatus === 'object' ? 'Saved' : 'Save word' }}
+          {{
+            dbStatus && typeof dbStatus === 'object'
+              ? 'Saved'
+              : isPhrase
+                ? 'Save phrase'
+                : 'Save word'
+          }}
         </v-btn>
       </template>
     </v-card-text>
@@ -60,6 +67,7 @@ const props = defineProps({
   dbStatus: { type: [Boolean, Object], default: null }, // null | false | object
   saving: { type: Boolean, default: false },
   isNullRoot: { type: Boolean, default: false },
+  isPhrase: { type: Boolean, default: false },
 })
 
 defineEmits(['update:posCode', 'save'])

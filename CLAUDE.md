@@ -6,10 +6,9 @@
 ## What this project is
 
 A single-page Vue 3 app for translating words and phrases via a local
-translation service API (https://github.com/noxpert/translation-service). 
-The primary loop: type a word → translate → review
-result (input word + root word) → optionally save to the database.
-Part of a broader language-learning toolkit.
+translation service API (https://github.com/noxpert/translation-service).
+The primary loop: type a word or phrase → translate → review result → optionally
+save to the database. Part of a broader language-learning toolkit.
 
 ## Tech stack
 
@@ -19,9 +18,11 @@ Part of a broader language-learning toolkit.
 | UI | Vuetify 3 — Material Design; primary color `#00695C` (teal-darken-2) |
 | State | Pinia — Composition API store style |
 | Persistence | pinia-plugin-persistedstate — persists `sourceLang` + `targetLang` only |
-| Build | Vite 5 |
+| Build | Vite 6 |
 | Production | nginx:alpine serving the static build; `/api/*` proxied to translation service |
 | Icons | MDI (`@mdi/font`) |
+| Testing | Vitest + @vue/test-utils + happy-dom |
+| Linting | ESLint (`eslint-plugin-vue` flat/recommended) + Prettier |
 
 ## Project structure
 
@@ -31,13 +32,21 @@ src/
   App.vue                 Shell: app bar, service-unavailable banner, health check
   components/
     TranslateForm.vue     Language selects, word input, context textarea, translate button
-    ResultCard.vue        Two WordPanels side-by-side + optional notes section
-    WordPanel.vue         Single word display — source/target text, POS select, save button
+    ResultCard.vue        One or two WordPanels + optional notes section
+    WordPanel.vue         Single word/phrase display — text, POS select, save button
     StatusChip.vue        "In database" / "Not in database" / "Checking..." chip
   services/
     api.js                All fetch calls; structured error throwing
   stores/
     translate.js          Single Pinia store: all app state + actions
+tests/
+  setup.js                Vitest global setup: Vuetify plugin, browser API class mocks
+  stores/
+    translate.test.js     43 store tests
+  components/
+    StatusChip.test.js
+    WordPanel.test.js
+    ResultCard.test.js
 ```
 
 ## Running locally
@@ -48,6 +57,12 @@ make dev          # or: npm install && npm run dev → http://localhost:5173
 
 # Docker production build (serves on :8082)
 make build && make up
+
+# Tests
+make test         # or: npm test
+
+# Lint + format checks
+make lint         # or: npm run lint && npm run format:check
 ```
 
 ## API / proxy
@@ -68,9 +83,10 @@ Never hardcode `localhost:8081` in Vue code — always use `/api/*`.
 | `VITE_DEFAULT_SOURCE_LANG` | `hu` | Initial source language (first load only) |
 | `VITE_DEFAULT_TARGET_LANG` | `en` | Initial target language (first load only) |
 | `VITE_SOURCE_NAME` | `vocab-app` | Provenance tag sent on every save |
+| `VITE_SPACE_INDICATES_PHRASE` | `true` | Treat spaced input as a phrase |
 
 Copy `.env.example` to `.env` to configure. After first load, `sourceLang` and
-`targetLang` are persisted to localStorage and override these defaults.
+`targetLang` are persisted to localStorage and override their defaults.
 
 ## State conventions (translate.js store)
 
@@ -79,8 +95,13 @@ The store uses Pinia Composition API style. Key state semantics:
 ```
 inputWordStatus / rootWordStatus:
   null    → database check in progress ("Checking...")
-  false   → word not found in database ("Not in database")
+  false   → not found in database ("Not in database")
   object  → found record ("In database") — also disables the Save button
+
+isPhrase:
+  false   → input is a single word: show POS select, show root word panel
+  true    → input is a phrase: hide POS select, hide root word panel,
+            save via POST /phrases, search phrases[] array for status
 ```
 
 All API actions catch errors and set `store.error` — never let an exception
@@ -98,13 +119,19 @@ propagate out of a store action.
 
 ## Key business logic
 
+**Phrase detection** — at the start of `doTranslate()`, `isPhrase` is set to
+`true` when `VITE_SPACE_INDICATES_PHRASE !== 'false'` and the trimmed input
+contains a space. This is evaluated per-translation; the result card adapts its
+layout accordingly.
+
 **Search is substring-based** — the backend `/search` endpoint may return more
 results than expected. `findExactMatch()` in the store filters client-side for
 an exact case-insensitive match across all translations of each record.
 
-**Parallel search after translation** — after a successful translate, two
-`POST /search` calls run in parallel (via `Promise.all`) to check database
-status for the input word and root word simultaneously.
+**Phrase vs word database check** — after translation, `checkDatabaseStatus()`
+routes to `results.phrases` (for phrases) or `results.words` (for words). For
+phrases, only one search call is made (no root). For words with a root, two
+searches run in parallel via `Promise.all`.
 
 **Null root** — if `result.root_source` is null, the word is already in root
 form. `rootWordStatus` is set to `false` immediately (no search needed), and
@@ -112,8 +139,9 @@ form. `rootWordStatus` is set to `false` immediately (no search needed), and
 
 **Save payload** always includes:
 - `source_name: 'vocab-app'` (provenance tracking)
-- `is_verified: false` (verification is a separate future workflow)
 - `context` from the input textarea (null if empty)
+- Words additionally include `part_of_speech` and `is_verified: false`
+- Phrases omit both (phrases have neither POS nor verification workflow)
 
 ## API surface used
 
@@ -123,23 +151,58 @@ form. `rootWordStatus` is set to `false` immediately (no search needed), and
 | GET | `/languages` | Language dropdown options |
 | GET | `/parts-of-speech` | POS dropdown options |
 | POST | `/translate` | Translate input text |
-| POST | `/search` | Check if word is already in database |
+| POST | `/search` | Check if word/phrase is already in database |
 | POST | `/words` | Save a word + translations |
-| POST | `/phrases` | Save a phrase + translations (available in api.js, not yet in UI) |
+| POST | `/phrases` | Save a phrase + translations |
 
-## Code quality tools
+## Testing
 
-ESLint and Prettier are the recommended additions — see install instructions below.
+Stack: **Vitest** + **@vue/test-utils** + **happy-dom** (71 tests).
 
 ```bash
-npm install -D eslint eslint-plugin-vue @vue/eslint-config-prettier prettier
+npm test              # run once
+npm run test:watch    # watch mode
+npm run test:coverage # with coverage report
 ```
 
-Config files to add: `eslint.config.js` and `.prettierrc.json`.
-Run via `npm run lint` and `npm run format` (add to `package.json` scripts).
+**Test setup decisions** (in `vite.config.js` and `tests/setup.js`):
 
-See [.github/copilot-instructions.md](.github/copilot-instructions.md) for
-the full recommended config and rationale.
+- `vite-plugin-vuetify` is disabled in test mode (`process.env.VITEST`) to prevent
+  it from transforming Vuetify's own component files when they are inlined, which
+  would strip render functions from internal components like `VProgressLinear`
+- A `cssStubPlugin` intercepts all `.css` loads and returns an empty string, since
+  happy-dom can't process Vuetify's CSS as Node.js ESM modules
+- `server.deps.inline: ['vuetify']` routes Vuetify through Vite's pipeline so the
+  CSS stub can intercept those imports
+- `ResizeObserver` and `IntersectionObserver` are mocked as **classes** (not arrow
+  functions) because Vuetify calls them with `new`
+
+New store tests go in `tests/stores/translate.test.js`. New component tests go in
+`tests/components/`. Mock `../../src/services/api.js` with `vi.mock` and set up a
+fresh Pinia per test with `setActivePinia(createPinia())`.
+
+## Code quality
+
+```bash
+npm run lint          # ESLint
+npm run lint:fix      # ESLint with auto-fix
+npm run format        # Prettier (write)
+npm run format:check  # Prettier (check only — used in CI)
+make lint             # runs both lint and format:check
+```
+
+Config files: `eslint.config.js`, `.prettierrc.json`.
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs three independent jobs on every
+PR to `main` and every push to `main`:
+
+| Job | Steps |
+|---|---|
+| Lint & Format | `npm run lint` + `npm run format:check` |
+| Tests | `npm test` |
+| Build | `npm run build` |
 
 ## What not to do
 
@@ -151,3 +214,4 @@ the full recommended config and rationale.
 - Do not add custom CSS for spacing/color when a Vuetify utility class exists
 - Do not commit `.env` — it is gitignored; use `.env.example` for documentation
 - Do not include the translation service in `docker-compose.yml` — it runs independently
+- Do not use arrow functions as browser API mocks in tests — Vuetify needs `new`
