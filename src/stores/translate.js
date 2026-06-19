@@ -2,10 +2,12 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import * as api from '../services/api.js'
 
-function findExactMatch(words, text) {
+const spaceIndicatesPhrase = import.meta.env.VITE_SPACE_INDICATES_PHRASE !== 'false'
+
+function findExactMatch(records, text) {
   if (!text) return undefined
   const needle = text.trim().toLowerCase()
-  return words.find((record) =>
+  return records.find((record) =>
     record.translations.some((t) => t.text.trim().toLowerCase() === needle)
   )
 }
@@ -25,6 +27,7 @@ export const useTranslateStore = defineStore(
 
     // Result
     const result = ref(null)
+    const isPhrase = ref(false)
     const inputWordStatus = ref(null) // null=checking, false=not found, object=record
     const rootWordStatus = ref(null)
 
@@ -70,6 +73,7 @@ export const useTranslateStore = defineStore(
       loading.value = true
       error.value = null
       result.value = null
+      isPhrase.value = spaceIndicatesPhrase && inputText.value.trim().includes(' ')
       inputWordStatus.value = null
       rootWordStatus.value = null
 
@@ -79,8 +83,10 @@ export const useTranslateStore = defineStore(
           source_lang: sourceLang.value,
           target_lang: targetLang.value,
         })
-        partOfSpeechInput.value = result.value.part_of_speech ?? 'other'
-        partOfSpeechRoot.value = result.value.part_of_speech ?? 'other'
+        if (!isPhrase.value) {
+          partOfSpeechInput.value = result.value.part_of_speech ?? 'other'
+          partOfSpeechRoot.value = result.value.part_of_speech ?? 'other'
+        }
         await checkDatabaseStatus()
       } catch (err) {
         error.value = err.message ?? 'Translation failed.'
@@ -92,35 +98,44 @@ export const useTranslateStore = defineStore(
     async function checkDatabaseStatus() {
       if (!result.value) return
 
-      const hasRoot = !!result.value.root_source
-
       try {
-        if (hasRoot) {
-          const [inputResults, rootResults] = await Promise.all([
-            api.search({
-              text: result.value.source_text,
-              source_lang: sourceLang.value,
-              target_lang: targetLang.value,
-            }),
-            api.search({
-              text: result.value.root_source,
-              source_lang: sourceLang.value,
-              target_lang: targetLang.value,
-            }),
-          ])
-          inputWordStatus.value =
-            findExactMatch(inputResults.words, result.value.source_text) ?? false
-          rootWordStatus.value =
-            findExactMatch(rootResults.words, result.value.root_source) ?? false
-        } else {
-          const inputResults = await api.search({
+        if (isPhrase.value) {
+          const results = await api.search({
             text: result.value.source_text,
             source_lang: sourceLang.value,
             target_lang: targetLang.value,
           })
-          inputWordStatus.value =
-            findExactMatch(inputResults.words, result.value.source_text) ?? false
+          inputWordStatus.value = findExactMatch(results.phrases, result.value.source_text) ?? false
           rootWordStatus.value = false
+        } else {
+          const hasRoot = !!result.value.root_source
+          if (hasRoot) {
+            const [inputResults, rootResults] = await Promise.all([
+              api.search({
+                text: result.value.source_text,
+                source_lang: sourceLang.value,
+                target_lang: targetLang.value,
+              }),
+              api.search({
+                text: result.value.root_source,
+                source_lang: sourceLang.value,
+                target_lang: targetLang.value,
+              }),
+            ])
+            inputWordStatus.value =
+              findExactMatch(inputResults.words, result.value.source_text) ?? false
+            rootWordStatus.value =
+              findExactMatch(rootResults.words, result.value.root_source) ?? false
+          } else {
+            const inputResults = await api.search({
+              text: result.value.source_text,
+              source_lang: sourceLang.value,
+              target_lang: targetLang.value,
+            })
+            inputWordStatus.value =
+              findExactMatch(inputResults.words, result.value.source_text) ?? false
+            rootWordStatus.value = false
+          }
         }
       } catch {
         // Non-fatal: default to not-found so save button is available
@@ -133,18 +148,29 @@ export const useTranslateStore = defineStore(
       if (!result.value) return
       savingInput.value = true
       try {
-        inputWordStatus.value = await api.saveWord({
-          translations: [
-            { language_code: sourceLang.value, text: result.value.source_text },
-            { language_code: targetLang.value, text: result.value.target_text },
-          ],
-          part_of_speech: partOfSpeechInput.value,
-          context: context.value || null,
-          source_name: import.meta.env.VITE_SOURCE_NAME ?? 'vocab-app',
-          is_verified: false,
-        })
+        if (isPhrase.value) {
+          inputWordStatus.value = await api.savePhrase({
+            translations: [
+              { language_code: sourceLang.value, text: result.value.source_text },
+              { language_code: targetLang.value, text: result.value.target_text },
+            ],
+            context: context.value || null,
+            source_name: import.meta.env.VITE_SOURCE_NAME ?? 'vocab-app',
+          })
+        } else {
+          inputWordStatus.value = await api.saveWord({
+            translations: [
+              { language_code: sourceLang.value, text: result.value.source_text },
+              { language_code: targetLang.value, text: result.value.target_text },
+            ],
+            part_of_speech: partOfSpeechInput.value,
+            context: context.value || null,
+            source_name: import.meta.env.VITE_SOURCE_NAME ?? 'vocab-app',
+            is_verified: false,
+          })
+        }
       } catch (err) {
-        error.value = err.message ?? 'Failed to save word.'
+        error.value = err.message ?? 'Failed to save.'
       } finally {
         savingInput.value = false
       }
@@ -179,6 +205,7 @@ export const useTranslateStore = defineStore(
       partOfSpeechInput,
       partOfSpeechRoot,
       result,
+      isPhrase,
       inputWordStatus,
       rootWordStatus,
       serviceAvailable,
