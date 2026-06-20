@@ -63,17 +63,34 @@
         placeholder="e.g. A Pál-utcai Fiúk, ch. 3 — where you encountered it"
       />
 
+      <v-checkbox
+        v-model="store.validateBeforeTranslate"
+        label="Validate before translating"
+        hide-details
+        density="compact"
+        class="mt-2"
+      />
+
       <v-btn
         block
         color="teal-darken-2"
         size="large"
-        :loading="store.loading"
+        :loading="store.loading || store.validating"
+        :disabled="!!store.validationPending"
         prepend-icon="mdi-translate"
         class="mt-4"
         @click="store.doTranslate()"
       >
         Translate
       </v-btn>
+
+      <v-alert
+        v-if="store.validationNotice === 'valid'"
+        type="success"
+        variant="tonal"
+        class="mt-3"
+        text="Text looks correct."
+      />
 
       <v-alert
         v-if="store.error"
@@ -84,6 +101,13 @@
         :text="store.error"
         @click:close="store.error = null"
       />
+
+      <ValidationPanel
+        v-if="store.validationPending"
+        :original-text="store.validationPending.originalText"
+        :corrections="store.validationPending.corrections"
+        @select="(text) => store.selectCorrection(text)"
+      />
     </v-card-text>
   </v-card>
 </template>
@@ -91,6 +115,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useTranslateStore } from '../stores/translate.js'
+import ValidationPanel from './ValidationPanel.vue'
 
 const store = useTranslateStore()
 

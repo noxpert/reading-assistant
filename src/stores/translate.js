@@ -34,9 +34,13 @@ export const useTranslateStore = defineStore(
     // UI
     const serviceAvailable = ref(true)
     const loading = ref(false)
+    const validating = ref(false)
     const savingInput = ref(false)
     const savingRoot = ref(false)
     const error = ref(null)
+    const validateBeforeTranslate = ref(false)
+    const validationPending = ref(null) // { originalText, corrections } while awaiting user selection
+    const validationNotice = ref(null) // 'valid' after a successful validation check
 
     // Reference data
     const languages = ref([])
@@ -67,9 +71,7 @@ export const useTranslateStore = defineStore(
       targetLang.value = tmp
     }
 
-    async function doTranslate() {
-      if (!inputText.value.trim()) return
-
+    async function _executeTranslate() {
       loading.value = true
       error.value = null
       result.value = null
@@ -93,6 +95,43 @@ export const useTranslateStore = defineStore(
       } finally {
         loading.value = false
       }
+    }
+
+    async function doTranslate() {
+      if (!inputText.value.trim()) return
+
+      validationPending.value = null
+      validationNotice.value = null
+
+      if (validateBeforeTranslate.value) {
+        validating.value = true
+        error.value = null
+        try {
+          const validation = await api.validate({ text: inputText.value, lang: sourceLang.value })
+          if (!validation.is_valid) {
+            validationPending.value = {
+              originalText: validation.text,
+              corrections: validation.corrections,
+            }
+            return
+          }
+          validationNotice.value = 'valid'
+        } catch (err) {
+          error.value = err.message ?? 'Validation failed.'
+          return
+        } finally {
+          validating.value = false
+        }
+      }
+
+      await _executeTranslate()
+    }
+
+    async function selectCorrection(text) {
+      inputText.value = text
+      validationPending.value = null
+      validationNotice.value = null
+      await _executeTranslate()
     }
 
     async function checkDatabaseStatus() {
@@ -210,15 +249,20 @@ export const useTranslateStore = defineStore(
       rootWordStatus,
       serviceAvailable,
       loading,
+      validating,
       savingInput,
       savingRoot,
       error,
+      validateBeforeTranslate,
+      validationPending,
+      validationNotice,
       languages,
       partsOfSpeech,
       checkHealth,
       loadReferenceData,
       swapLanguages,
       doTranslate,
+      selectCorrection,
       doSaveInput,
       doSaveRoot,
     }
