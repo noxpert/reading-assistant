@@ -29,7 +29,8 @@ Part of a larger language-learning toolkit.
 src/main.js                 Bootstrap: Vuetify + Pinia + App mount
 src/App.vue                 Root shell, health check on mount, service banner
 src/components/
-  TranslateForm.vue         Language selects, word input, context, translate button
+  TranslateForm.vue         Language selects, word input, context, validate checkbox, translate button
+  ValidationPanel.vue       Pure presentational: correction picker when validate returns is_valid=false
   ResultCard.vue            One or two WordPanels + notes section
   WordPanel.vue             Pure presentational: word/phrase display + POS select + save
   StatusChip.vue            Pure presentational: database status chip
@@ -37,8 +38,8 @@ src/services/api.js         All fetch calls, error normalisation
 src/stores/translate.js     All state + async actions
 tests/
   setup.js                  Vitest global: Vuetify plugin, ResizeObserver/IntersectionObserver class mocks
-  stores/translate.test.js  43 store tests
-  components/               StatusChip, WordPanel, ResultCard tests
+  stores/translate.test.js  Store tests
+  components/               StatusChip, WordPanel, ResultCard, ValidationPanel tests
 ```
 
 ## Patterns to follow
@@ -60,8 +61,8 @@ defineEmits(['save'])
 </script>
 ```
 
-- `WordPanel` and `StatusChip` are **pure presentational** — props in, emits out,
-  no store access. All other components may access the store directly.
+- `WordPanel`, `StatusChip`, and `ValidationPanel` are **pure presentational** — props
+  in, emits out, no store access. All other components may access the store directly.
 - Prefer Vuetify utility classes (`text-medium-emphasis`, `mb-4`, `pa-3`) over
   scoped CSS for spacing and typography.
 
@@ -199,6 +200,7 @@ In `vite.config.js`, when `process.env.VITEST` is set:
 - `POST /search` returns substring matches — always filter with `findExactMatch()` client-side
 - `source_name: 'vocab-app'` is always sent on every save (word and phrase)
 - For phrases, only one `POST /search` is made (no root search, `rootWordStatus = false`)
+- Validate flow (when `validateBeforeTranslate=true`): `POST /validate` runs before `POST /translate`; `is_valid=false` sets `validationPending` and blocks translate until user calls `selectCorrection()`
 
 ## Code quality
 

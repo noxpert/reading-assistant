@@ -31,7 +31,8 @@ src/
   main.js                 Vue entry — registers Vuetify, Pinia, mounts App
   App.vue                 Shell: app bar, service-unavailable banner, health check
   components/
-    TranslateForm.vue     Language selects, word input, context textarea, translate button
+    TranslateForm.vue     Language selects, word input, context textarea, validate checkbox, translate button
+    ValidationPanel.vue   Correction picker shown when validate returns is_valid=false (presentational)
     ResultCard.vue        One or two WordPanels + optional notes section
     WordPanel.vue         Single word/phrase display — text, POS select, save button
     StatusChip.vue        "In database" / "Not in database" / "Checking..." chip
@@ -42,11 +43,12 @@ src/
 tests/
   setup.js                Vitest global setup: Vuetify plugin, browser API class mocks
   stores/
-    translate.test.js     43 store tests
+    translate.test.js     Store tests
   components/
     StatusChip.test.js
     WordPanel.test.js
     ResultCard.test.js
+    ValidationPanel.test.js
 ```
 
 ## Running locally
@@ -102,6 +104,22 @@ isPhrase:
   false   → input is a single word: show POS select, show root word panel
   true    → input is a phrase: hide POS select, hide root word panel,
             save via POST /phrases, search phrases[] array for status
+
+validateBeforeTranslate:
+  false   → (default) skip validation, translate immediately
+  true    → call POST /validate before translating; on is_valid=false, pause
+            and show ValidationPanel; on is_valid=true, set validationNotice='valid'
+            and proceed to translate
+
+validationPending:
+  null        → no pending correction selection
+  { originalText, corrections }
+              → validation returned is_valid=false; UI shows ValidationPanel;
+                translate is blocked until selectCorrection() is called
+
+validationNotice:
+  null    → no notice
+  'valid' → validation passed; shown briefly while translate is in progress
 ```
 
 All API actions catch errors and set `store.error` — never let an exception
@@ -150,6 +168,7 @@ form. `rootWordStatus` is set to `false` immediately (no search needed), and
 | GET | `/` | Health check on startup |
 | GET | `/languages` | Language dropdown options |
 | GET | `/parts-of-speech` | POS dropdown options |
+| POST | `/validate` | Check spelling/grammar before translating (optional) |
 | POST | `/translate` | Translate input text |
 | POST | `/search` | Check if word/phrase is already in database |
 | POST | `/words` | Save a word + translations |

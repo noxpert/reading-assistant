@@ -43,6 +43,13 @@ export async function fetchPartsOfSpeech() {
   return request('/parts-of-speech')
 }
 
+export async function validate({ text, lang }) {
+  return request('/validate', {
+    method: 'POST',
+    body: JSON.stringify({ text, lang }),
+  })
+}
+
 export async function translate({ text, source_lang, target_lang }) {
   return request('/translate', {
     method: 'POST',

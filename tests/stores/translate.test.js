@@ -7,6 +7,7 @@ vi.mock('../../src/services/api.js', () => ({
   checkHealth: vi.fn(),
   fetchLanguages: vi.fn(),
   fetchPartsOfSpeech: vi.fn(),
+  validate: vi.fn(),
   translate: vi.fn(),
   search: vi.fn(),
   saveWord: vi.fn(),
@@ -183,6 +184,147 @@ describe('doTranslate', () => {
     expect(store.rootWordStatus).toBeNull()
     expect(store.error).toBeNull()
     await translatePromise
+  })
+})
+
+describe('doTranslate — validate flow', () => {
+  it('skips validate when validateBeforeTranslate=false', async () => {
+    api.translate.mockResolvedValue(wordResult())
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.validateBeforeTranslate = false
+    await store.doTranslate()
+    expect(api.validate).not.toHaveBeenCalled()
+  })
+
+  it('calls validate with inputText and sourceLang when validateBeforeTranslate=true', async () => {
+    api.validate.mockResolvedValue({ is_valid: true, text: 'alma', corrections: null })
+    api.translate.mockResolvedValue(wordResult())
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.sourceLang = 'hu'
+    store.validateBeforeTranslate = true
+    await store.doTranslate()
+    expect(api.validate).toHaveBeenCalledWith({ text: 'alma', lang: 'hu' })
+  })
+
+  it('proceeds to translate when is_valid=true', async () => {
+    api.validate.mockResolvedValue({ is_valid: true, text: 'alma', corrections: null })
+    api.translate.mockResolvedValue(wordResult())
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.validateBeforeTranslate = true
+    await store.doTranslate()
+    expect(api.translate).toHaveBeenCalled()
+  })
+
+  it('sets validationNotice to "valid" when is_valid=true', async () => {
+    api.validate.mockResolvedValue({ is_valid: true, text: 'alma', corrections: null })
+    api.translate.mockResolvedValue(wordResult())
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.validateBeforeTranslate = true
+    await store.doTranslate()
+    expect(store.validationNotice).toBe('valid')
+  })
+
+  it('sets validationPending and does not translate when is_valid=false', async () => {
+    api.validate.mockResolvedValue({ is_valid: false, text: 'siett', corrections: ['sietni', 'sietek'] })
+    const store = useTranslateStore()
+    store.inputText = 'siett'
+    store.validateBeforeTranslate = true
+    await store.doTranslate()
+    expect(store.validationPending).toEqual({ originalText: 'siett', corrections: ['sietni', 'sietek'] })
+    expect(api.translate).not.toHaveBeenCalled()
+  })
+
+  it('sets error and does not translate on validate failure', async () => {
+    api.validate.mockRejectedValue({ message: 'Ollama unreachable' })
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.validateBeforeTranslate = true
+    await store.doTranslate()
+    expect(store.error).toBe('Ollama unreachable')
+    expect(api.translate).not.toHaveBeenCalled()
+  })
+
+  it('resets validating to false after validation success', async () => {
+    api.validate.mockResolvedValue({ is_valid: true, text: 'alma', corrections: null })
+    api.translate.mockResolvedValue(wordResult())
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.validateBeforeTranslate = true
+    await store.doTranslate()
+    expect(store.validating).toBe(false)
+  })
+
+  it('resets validating to false after validation failure', async () => {
+    api.validate.mockRejectedValue({ message: 'error' })
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.validateBeforeTranslate = true
+    await store.doTranslate()
+    expect(store.validating).toBe(false)
+  })
+
+  it('clears validationPending and validationNotice at start of doTranslate', async () => {
+    api.validate.mockResolvedValue({ is_valid: true, text: 'alma', corrections: null })
+    api.translate.mockResolvedValue(wordResult())
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.inputText = 'alma'
+    store.validationPending = { originalText: 'old', corrections: ['old'] }
+    store.validationNotice = 'valid'
+    store.validateBeforeTranslate = false
+    const promise = store.doTranslate()
+    expect(store.validationPending).toBeNull()
+    expect(store.validationNotice).toBeNull()
+    await promise
+  })
+})
+
+describe('selectCorrection', () => {
+  it('updates inputText to the selected text', async () => {
+    api.translate.mockResolvedValue(wordResult({ source_text: 'sietni' }))
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.inputText = 'siett'
+    store.validationPending = { originalText: 'siett', corrections: ['sietni'] }
+    await store.selectCorrection('sietni')
+    expect(store.inputText).toBe('sietni')
+  })
+
+  it('clears validationPending after selection', async () => {
+    api.translate.mockResolvedValue(wordResult())
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.validationPending = { originalText: 'siett', corrections: ['sietni'] }
+    await store.selectCorrection('sietni')
+    expect(store.validationPending).toBeNull()
+  })
+
+  it('calls translate with the selected text', async () => {
+    api.translate.mockResolvedValue(wordResult({ source_text: 'sietni' }))
+    api.search.mockResolvedValue(emptySearch)
+    const store = useTranslateStore()
+    store.sourceLang = 'hu'
+    store.targetLang = 'en'
+    await store.selectCorrection('sietni')
+    expect(api.translate).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'sietni', source_lang: 'hu', target_lang: 'en' })
+    )
+  })
+
+  it('sets error on translate failure', async () => {
+    api.translate.mockRejectedValue({ message: 'Service down' })
+    const store = useTranslateStore()
+    await store.selectCorrection('sietni')
+    expect(store.error).toBe('Service down')
   })
 })
 
