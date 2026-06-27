@@ -40,6 +40,12 @@ src/
     api.js                All fetch calls; structured error throwing
   stores/
     translate.js          Single Pinia store: all app state + actions
+    database.js           Pinia store: database browse/search state + actions
+  router/
+    index.js              Vue Router — / → DatabasePage, /translate → TranslatePage
+  views/
+    DatabasePage.vue      Browse and search saved words/phrases
+    TranslatePage.vue     Translate form + result card
 tests/
   setup.js                Vitest global setup: Vuetify plugin, browser API class mocks
   stores/

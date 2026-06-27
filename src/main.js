@@ -7,6 +7,7 @@ import '@mdi/font/css/materialdesignicons.css'
 import 'vuetify/styles'
 
 import App from './App.vue'
+import router from './router/index.js'
 
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
@@ -28,4 +29,4 @@ const vuetify = createVuetify({
   },
 })
 
-createApp(App).use(pinia).use(vuetify).mount('#app')
+createApp(App).use(pinia).use(vuetify).use(router).mount('#app')
